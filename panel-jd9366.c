@@ -22,6 +22,8 @@
 #include <linux/module.h>
 #include <linux/of.h>
 
+#include <video/mipi_display.h>
+
 #include "jd9366_init_seq.h"
 
 /*
