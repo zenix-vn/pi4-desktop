@@ -1,0 +1,101 @@
+// Overlay cho panel OSPTEK YDP1010BT006-V1 10.1" 800x1280 (JD9366) tren Raspberry Pi 4.
+// Adapter OSPTEK J2 (15 pin) -> cong DISPLAY cua Pi 4 (DSI1, 2 lane). Cam ung I2C 0x68 tren
+// chan 11/12 cua cong DSI = i2c_csi_dsi (I2C0 qua mux, GPIO44/45, /dev/i2c-10).
+//
+// config.txt:
+//   dtoverlay=vc4-kms-v3d
+//   dtoverlay=jd9366-pi4
+//   # Tham so tuy chon (viet tren cung dong, cach nhau dau phay):
+//   #   rotation=90|180|270   xoay hinh (bao cho DRM/desktop qua "panel orientation")
+//   #   swapxy,invx,invy      dao truc cam ung neu toa do lech huong
+//   #   te                    da noi chan TE (J3 chan 4) vao GPIO17: doc cam ung dung luc trong doc
+//   #   i2c_hz=<n>            toc do I2C cam ung, mac dinh 400000 (giong ban ESP32)
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2711";
+
+	fragment@0 {
+		target = <&dsi1>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			port {
+				dsi_out: endpoint {
+					remote-endpoint = <&panel_in>;
+				};
+			};
+
+			panel: panel@0 {
+				compatible = "osptek,ydp1010bt006";
+				reg = <0>;
+				rotation = <0>;
+
+				port {
+					panel_in: endpoint {
+						remote-endpoint = <&dsi_out>;
+					};
+				};
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&i2c_csi_dsi>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			ts: touchscreen@68 {
+				compatible = "osptek,ydp1010bt006-touch";
+				reg = <0x68>;
+			};
+		};
+	};
+
+	/* I2C0 va bo mux GPIO0/1 <-> GPIO44/45 phai bat thi i2c_csi_dsi moi chay */
+	fragment@2 {
+		target = <&i2c0if>;
+		__overlay__ {
+			status = "okay";
+			clock-frequency = <400000>;
+		};
+	};
+
+	fragment@3 {
+		target = <&i2c0mux>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	/* Thay fragment@1 khi co tham so te: TE noi vao GPIO17 (kich hoat muc cao) */
+	fragment@4 {
+		target = <&i2c_csi_dsi>;
+		__dormant__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			ts_te: touchscreen@68 {
+				compatible = "osptek,ydp1010bt006-touch";
+				reg = <0x68>;
+				te-gpios = <&gpio 17 0>;
+			};
+		};
+	};
+
+	__overrides__ {
+		rotation = <&panel>, "rotation:0";
+		swapxy = <&ts>, "touchscreen-swapped-x-y?", <&ts_te>, "touchscreen-swapped-x-y?";
+		invx = <&ts>, "touchscreen-inverted-x?", <&ts_te>, "touchscreen-inverted-x?";
+		invy = <&ts>, "touchscreen-inverted-y?", <&ts_te>, "touchscreen-inverted-y?";
+		te = <0>, "-1+4";
+		i2c_hz = <&i2c0if>, "clock-frequency:0";
+	};
+};
